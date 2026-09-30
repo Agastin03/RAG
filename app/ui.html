@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agentic AI RAG Chatbot UI</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 antialiased min-h-screen p-4 md:p-8">
+  <div class="max-w-5xl mx-auto space-y-6">
+    
+    <!-- Header -->
+    <header class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-3">
+          <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-blue-600/20 text-blue-400 font-bold text-lg border border-blue-500/30">
+            🤖
+          </span>
+          <h1 class="text-2xl font-bold tracking-tight text-white">Agentic AI RAG Chatbot</h1>
+        </div>
+        <p class="text-slate-400 text-sm mt-1">Grounded PDF Knowledge Base Q&A with LangGraph & ChromaDB</p>
+      </div>
+      <div id="healthBadge" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="healthText">Loading status...</span>
+      </div>
+    </header>
+
+    <!-- Main Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      
+      <!-- PDF Upload & Knowledge Base Status Sidebar -->
+      <div class="lg:col-span-1 space-y-6">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl space-y-4">
+          <h2 class="text-base font-semibold text-white flex items-center gap-2">
+            📄 Knowledge Base PDF
+          </h2>
+          <p class="text-xs text-slate-400">Upload a new PDF to extract, chunk, and index into ChromaDB vector database.</p>
+
+          <form id="uploadForm" class="space-y-3">
+            <div id="dropZone" class="border-2 border-dashed border-slate-600 hover:border-blue-500 transition-colors rounded-xl p-4 text-center cursor-pointer bg-slate-900/50">
+              <input type="file" id="pdfFileInput" accept=".pdf" class="hidden">
+              <div class="space-y-1">
+                <span class="text-2xl">📥</span>
+                <p class="text-xs font-medium text-slate-300" id="fileNameDisplay">Click or drag PDF here</p>
+                <p class="text-[10px] text-slate-500">Only PDF files supported</p>
+              </div>
+            </div>
+            <button type="submit" id="uploadBtn" class="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs rounded-xl transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+              <span>Upload & Index PDF</span>
+            </button>
+          </form>
+
+          <div id="uploadStatus" class="hidden p-3 rounded-xl text-xs bg-slate-900 border border-slate-700 space-y-1">
+            <p id="uploadMsg" class="font-medium text-slate-300"></p>
+          </div>
+
+          <hr class="border-slate-700/60">
+
+          <div class="space-y-2 text-xs text-slate-400">
+            <div class="flex justify-between">
+              <span>Collection Name:</span>
+              <span class="font-mono text-slate-200">agentic_ai_knowledge</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Indexed Chunks:</span>
+              <span class="font-mono text-blue-400 font-bold" id="chunkCount">--</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Relevance Threshold:</span>
+              <span class="font-mono text-slate-200">0.50 (Cosine Similarity)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sample Questions -->
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl space-y-3">
+          <h3 class="text-xs font-semibold text-slate-300 uppercase tracking-wider">💡 Try Sample Questions</h3>
+          <div class="space-y-2">
+            <button class="sample-btn w-full text-left p-2.5 rounded-xl bg-slate-900/60 hover:bg-slate-700/60 text-xs text-slate-300 border border-slate-700/50 transition-all">
+              What is Agentic AI?
+            </button>
+            <button class="sample-btn w-full text-left p-2.5 rounded-xl bg-slate-900/60 hover:bg-slate-700/60 text-xs text-slate-300 border border-slate-700/50 transition-all">
+              How does Agentic AI differ from traditional generative AI?
+            </button>
+            <button class="sample-btn w-full text-left p-2.5 rounded-xl bg-slate-900/60 hover:bg-slate-700/60 text-xs text-slate-300 border border-slate-700/50 transition-all">
+              What are the core architectural components of an AI Agent?
+            </button>
+            <button class="sample-btn w-full text-left p-2.5 rounded-xl bg-slate-900/60 hover:bg-slate-700/60 text-xs text-amber-300/90 border border-amber-500/20 transition-all">
+              What is the capital of Australia? (Test Refusal)
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Q&A Chat Section -->
+      <div class="lg:col-span-2 space-y-6">
+        
+        <!-- Query Input Card -->
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl space-y-4">
+          <h2 class="text-base font-semibold text-white flex items-center gap-2">
+            🔍 Ask a Question
+          </h2>
+
+          <form id="chatForm" class="space-y-3">
+            <div class="relative">
+              <textarea id="questionInput" rows="3" placeholder="Ask anything about the Agentic AI eBook..." class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors resize-none"></textarea>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-xs text-slate-500">Strict PDF Grounding Enabled</span>
+              <button type="submit" id="askBtn" class="py-2.5 px-6 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs rounded-xl transition-all shadow-md flex items-center gap-2">
+                <span>Submit Query</span>
+                <span>➔</span>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Answer Result Card -->
+        <div id="resultCard" class="hidden bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+            <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+              ✨ Generated Answer
+            </h3>
+            <div id="confidenceBadge" class="px-2.5 py-1 rounded-full text-xs font-semibold"></div>
+          </div>
+
+          <div id="answerBox" class="text-sm text-slate-200 leading-relaxed bg-slate-900/80 p-4 rounded-xl border border-slate-700/50"></div>
+
+          <!-- Retrieved Chunks Container -->
+          <div class="space-y-3 pt-2">
+            <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+              📚 Retrieved Context Chunks (<span id="chunkCountBadge">0</span>)
+            </h4>
+            <div id="contextList" class="space-y-3"></div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = "";
+
+    const dropZone = document.getElementById('dropZone');
+    const pdfFileInput = document.getElementById('pdfFileInput');
+    const fileNameDisplay = document.getElementById('fileNameDisplay');
+    const uploadForm = document.getElementById('uploadForm');
+    const uploadStatus = document.getElementById('uploadStatus');
+    const uploadMsg = document.getElementById('uploadMsg');
+    const uploadBtn = document.getElementById('uploadBtn');
+
+    const chatForm = document.getElementById('chatForm');
+    const questionInput = document.getElementById('questionInput');
+    const askBtn = document.getElementById('askBtn');
+
+    const resultCard = document.getElementById('resultCard');
+    const answerBox = document.getElementById('answerBox');
+    const confidenceBadge = document.getElementById('confidenceBadge');
+    const contextList = document.getElementById('contextList');
+    const chunkCountBadge = document.getElementById('chunkCountBadge');
+
+    // Fetch Health Status
+    async function checkHealth() {
+      try {
+        const res = await fetch(`${API_BASE}/health`);
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('healthText').textContent = `System Operational (${data.total_indexed_chunks} Chunks)`;
+          document.getElementById('chunkCount').textContent = data.total_indexed_chunks;
+        }
+      } catch (err) {
+        document.getElementById('healthText').textContent = 'API Offline';
+      }
+    }
+
+    // Drag & Drop File Handling
+    dropZone.addEventListener('click', () => pdfFileInput.click());
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-blue-500'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-blue-500'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('border-blue-500');
+      if (e.dataTransfer.files.length > 0) {
+        pdfFileInput.files = e.dataTransfer.files;
+        fileNameDisplay.textContent = e.dataTransfer.files[0].name;
+      }
+    });
+
+    pdfFileInput.addEventListener('change', () => {
+      if (pdfFileInput.files.length > 0) {
+        fileNameDisplay.textContent = pdfFileInput.files[0].name;
+      }
+    });
+
+    // Upload PDF Form Handler
+    uploadForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!pdfFileInput.files.length) {
+        alert("Please select a PDF file first.");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', pdfFileInput.files[0]);
+
+      uploadStatus.classList.remove('hidden');
+      uploadMsg.textContent = "Processing and indexing PDF into ChromaDB...";
+      uploadBtn.disabled = true;
+
+      try {
+        const res = await fetch(`${API_BASE}/upload`, {
+          method: 'POST',
+          body: formData
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          uploadMsg.textContent = `Success! Indexed ${data.indexed_chunks} chunks from '${data.filename}'.`;
+          uploadMsg.className = "font-medium text-emerald-400";
+          checkHealth();
+        } else {
+          const err = await res.json();
+          uploadMsg.textContent = `Upload Error: ${err.detail || "Failed to process PDF"}`;
+          uploadMsg.className = "font-medium text-rose-400";
+        }
+      } catch (err) {
+        uploadMsg.textContent = "Network error uploading file.";
+        uploadMsg.className = "font-medium text-rose-400";
+      } finally {
+        uploadBtn.disabled = false;
+      }
+    });
+
+    // Sample Question Buttons
+    document.querySelectorAll('.sample-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        questionInput.value = btn.textContent.trim().replace(" (Test Refusal)", "");
+        chatForm.dispatchEvent(new Event('submit'));
+      });
+    });
+
+    // Submit Question Form Handler
+    chatForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const question = questionInput.value.strip ? questionInput.value.strip() : questionInput.value.trim();
+      if (!question) return;
+
+      askBtn.disabled = true;
+      askBtn.innerHTML = `<span>Searching...</span>`;
+
+      try {
+        const res = await fetch(`${API_BASE}/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question: question })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          renderResult(data);
+        } else {
+          alert("Error processing query.");
+        }
+      } catch (err) {
+        alert("Network error processing request.");
+      } finally {
+        askBtn.disabled = false;
+        askBtn.innerHTML = `<span>Submit Query</span><span>➔</span>`;
+      }
+    });
+
+    function formatMarkdown(raw) {
+      if (!raw) return "";
+      let html = raw
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
+        .replace(/`(.*?)`/g, '<code class="bg-slate-800 px-1 py-0.5 rounded text-blue-300 font-mono text-xs">$1</code>')
+        .replace(/\[Page\s*(\d+)\]/gi, '<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono text-[11px] border border-blue-500/30 font-semibold">[Page $1]</span>');
+
+      const lines = html.split('\n');
+      let inList = false;
+      let result = [];
+
+      lines.forEach(line => {
+        let trimmed = line.trim();
+        if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+          if (!inList) {
+            result.push('<ul class="list-disc pl-5 my-2 space-y-1.5">');
+            inList = true;
+          }
+          result.push(`<li class="text-slate-200">${trimmed.substring(2)}</li>`);
+        } else {
+          if (inList) {
+            result.push('</ul>');
+            inList = false;
+          }
+          if (trimmed) {
+            result.push(`<p class="my-1.5 leading-relaxed">${trimmed}</p>`);
+          }
+        }
+      });
+
+      if (inList) result.push('</ul>');
+      return result.join('');
+    }
+
+    function renderResult(data) {
+      resultCard.classList.remove('hidden');
+      answerBox.innerHTML = formatMarkdown(data.answer);
+
+      const conf = (data.confidence * 100).toFixed(1);
+      if (data.confidence >= 0.50) {
+        confidenceBadge.className = "px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30";
+        confidenceBadge.textContent = `Confidence: ${conf}% (Relevant)`;
+      } else {
+        confidenceBadge.className = "px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/30";
+        confidenceBadge.textContent = `Confidence: ${conf}% (Refusal)`;
+      }
+
+      contextList.innerHTML = "";
+      chunkCountBadge.textContent = data.retrieved_context.length;
+
+      data.retrieved_context.forEach((chunk, i) => {
+        const item = document.createElement('div');
+        item.className = "bg-slate-900 border border-slate-700/60 rounded-xl p-3.5 text-xs space-y-2";
+
+        const metaPage = chunk.metadata && chunk.metadata.page ? chunk.metadata.page : "Unknown";
+        const metaSource = chunk.metadata && chunk.metadata.source ? chunk.metadata.source : "PDF";
+
+        item.innerHTML = `
+          <div class="flex items-center justify-between text-[11px] text-slate-400 border-b border-slate-800 pb-2">
+            <span class="font-medium text-blue-400">Chunk #${i + 1} • Page ${metaPage} (${metaSource})</span>
+            <span class="font-mono text-slate-500">Distance: ${chunk.score}</span>
+          </div>
+          <p class="text-slate-300 leading-relaxed font-sans">${chunk.text}</p>
+        `;
+        contextList.appendChild(item);
+      });
+    }
+
+    checkHealth();
+  </script>
+</body>
+</html>
