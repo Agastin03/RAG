@@ -38,34 +38,21 @@ flowchart LR
         B6 --> B7["💾 ChromaStore.add_chunks()<br/>Store PDF #2 Chunks in ChromaDB"]:::pdf2
     end
 
-    subgraph Step3 ["💬 STEP 3: STRICT GROUNDED Q&A EXECUTION"]
-        C1["🔍 User Question<br/>(POST /chat)"]:::chat --> C2["⚡ Retriever.retrieve()<br/>Multi-Query + Hybrid Dense/BM25 + RRF"]:::chat
-        C2 --> C3["📚 Top-5 Context Chunks<br/>Extracted from PDF #2"]:::chat
-        C3 --> C4["🤖 GeminiLLM.generate()<br/>Strict PDF Grounding System Prompt"]:::chat
-        C4 --> C5["✨ Return Grounded Answer & Citations<br/>(Answers ONLY from PDF #2)"]:::chat
+    subgraph Step3 ["🕸️ STEP 3: ADVANCED LANGGRAPH RAG WORKFLOW"]
+        C1["🔍 User Question<br/>(POST /chat)"]:::chat --> N1["1️⃣ Node: understand_query<br/>Multi-Query Variations"]:::chat
+        N1 --> N2["2️⃣ Node: hybrid_retrieve<br/>ChromaDB Dense + BM25 Sparse + RRF"]:::chat
+        N2 --> N3["3️⃣ Node: rerank_context<br/>Score Top-5 Chunks from PDF #2"]:::chat
+        N3 --> N4["4️⃣ Node: evaluate_relevance<br/>Confidence Threshold >= 0.50"]:::chat
+        N4 --> COND{"Is Relevant?"}:::chat
+        COND -->|Yes| N5["5️⃣ Node: generate_answer<br/>Gemini System Grounding Prompt"]:::chat
+        COND -->|No| N6["6️⃣ Node: format_refusal<br/>Return Grounded Refusal Message"]:::chat
+        N5 --> N7["7️⃣ Node: validate_faithfulness<br/>Verify Zero Hallucination"]:::chat
+        N7 --> OUT["✨ Final Response<br/>(Answers ONLY from PDF #2)"]:::chat
+        N6 --> OUT
     end
 
     Step1 --> Step2
     Step2 --> Step3
-```
-
-### Advanced LangGraph RAG Chat Workflow
-```mermaid
-flowchart TD
-    UQ[User Query] --> QU[Node 1: Multi-Query Expansion]
-    QU -->|Query Variations| HR[Node 2: Hybrid Search Engine]
-    HR -->|ChromaDB Vector Search| DENSE[Dense Vector Results Top-10]
-    HR -->|BM25 Lexical Search| SPARSE[Sparse Lexical Results Top-10]
-    DENSE --> RRF[Reciprocal Rank Fusion RRF]
-    SPARSE --> RRF
-    RRF --> RR[Node 3: Context Reranking & Selection]
-    RR --> EVAL[Node 4: Relevance Confidence Threshold Check]
-    EVAL --> COND{Is Relevant? Confidence >= 0.50}
-    COND -->|Yes| GEN[Node 5: Gemini Grounded Answer Generation]
-    COND -->|No| REF[Node 6: Grounded Refusal Handler]
-    GEN --> VAL[Node 7: LangGraph Faithfulness Check]
-    REF --> END1([Return Refusal Message])
-    VAL --> END2([Return Grounded Answer & Context Chunks])
 ```
 
 ---
