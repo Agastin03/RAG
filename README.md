@@ -115,7 +115,7 @@ rag-agentic-ai/
    Copy `.env.example` to `.env`:
    ```bash
    # Windows
-   Copy-Item .env.example .env
+   copy .env.example .env
 
    # Linux / macOS
    cp .env.example .env
