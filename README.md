@@ -12,25 +12,60 @@ The chatbot answers questions **strictly based** on the official [Agentic AI eBo
 
 ---
 
-## 1. Advanced Architecture Workflow
+## 1. System Architecture & Workflows
 
+### Dynamic PDF Switch & Ingestion Flow
+```mermaid
+flowchart LR
+    classDef pdf1 fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#fff
+    classDef pdf2 fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#fff
+    classDef purge fill:#451a03,stroke:#f59e0b,stroke-width:2px,color:#fff
+    classDef chat fill:#1e1b4b,stroke:#8b5cf6,stroke-width:2px,color:#fff
+
+    subgraph Step1 ["📥 STEP 1: INITIAL PDF INGESTION"]
+        A1["📄 Upload document1.pdf<br/>(POST /upload)"]:::pdf1 --> A2["⚙️ PyMuPDF extract_pages()<br/>Extract Page Text & Metadata"]:::pdf1
+        A2 --> A3["✂️ split_text_recursively()<br/>Chunk Size 1000, Overlap 150"]:::pdf1
+        A3 --> A4["🧠 EmbeddingService<br/>384d Vectors (all-MiniLM-L6-v2)"]:::pdf1
+        A4 --> A5["💾 ChromaStore.add_chunks()<br/>Indexed in ChromaDB"]:::pdf1
+    end
+
+    subgraph Step2 ["🔄 STEP 2: DYNAMIC PDF SWITCH & PURGE"]
+        B1["📄 Upload document2.pdf<br/>(POST /upload)"]:::pdf2 --> B2["🔥 ChromaStore.reset_collection()<br/>delete_collection() & create_collection()"]:::purge
+        B2 --> B3["🧹 ChromaDB Collection:<br/>Purged & Wiped EMPTY"]:::purge
+        B3 --> B4["⚙️ PyMuPDF extract_pages()<br/>Extract PDF #2 Page Text"]:::pdf2
+        B4 --> B5["✂️ split_text_recursively()<br/>Chunk Size 1000, Overlap 150"]:::pdf2
+        B5 --> B6["🧠 EmbeddingService<br/>Generate 384d Vectors for PDF #2"]:::pdf2
+        B6 --> B7["💾 ChromaStore.add_chunks()<br/>Store PDF #2 Chunks in ChromaDB"]:::pdf2
+    end
+
+    subgraph Step3 ["💬 STEP 3: STRICT GROUNDED Q&A EXECUTION"]
+        C1["🔍 User Question<br/>(POST /chat)"]:::chat --> C2["⚡ Retriever.retrieve()<br/>Multi-Query + Hybrid Dense/BM25 + RRF"]:::chat
+        C2 --> C3["📚 Top-5 Context Chunks<br/>Extracted from PDF #2"]:::chat
+        C3 --> C4["🤖 GeminiLLM.generate()<br/>Strict PDF Grounding System Prompt"]:::chat
+        C4 --> C5["✨ Return Grounded Answer & Citations<br/>(Answers ONLY from PDF #2)"]:::chat
+    end
+
+    Step1 --> Step2
+    Step2 --> Step3
+```
+
+### Advanced LangGraph RAG Chat Workflow
 ```mermaid
 flowchart TD
-    UQ[User Query] --> QU[Node 1: Query Understanding & Multi-Query Expansion]
-    QU -->|Query Variations| HR[Node 2: Hybrid Retrieval Engine]
+    UQ[User Query] --> QU[Node 1: Multi-Query Expansion]
+    QU -->|Query Variations| HR[Node 2: Hybrid Search Engine]
     HR -->|ChromaDB Vector Search| DENSE[Dense Vector Results Top-10]
     HR -->|BM25 Lexical Search| SPARSE[Sparse Lexical Results Top-10]
     DENSE --> RRF[Reciprocal Rank Fusion RRF]
     SPARSE --> RRF
     RRF --> RR[Node 3: Context Reranking & Selection]
-    RR --> CS[Formatted Context Blocks]
-    CS --> EVAL[Node 4: Relevance Confidence Threshold Check]
+    RR --> EVAL[Node 4: Relevance Confidence Threshold Check]
     EVAL --> COND{Is Relevant? Confidence >= 0.50}
     COND -->|Yes| GEN[Node 5: Gemini Grounded Answer Generation]
     COND -->|No| REF[Node 6: Grounded Refusal Handler]
-    GEN --> VAL[Node 7: Answer Faithfulness Check]
-    REF --> END([END])
-    VAL --> END
+    GEN --> VAL[Node 7: LangGraph Faithfulness Check]
+    REF --> END1([Return Refusal Message])
+    VAL --> END2([Return Grounded Answer & Context Chunks])
 ```
 
 ---
